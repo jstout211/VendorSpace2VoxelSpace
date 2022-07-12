@@ -5,12 +5,16 @@ Created on Mon Jul 11 11:14:02 2022
 
 @author: jstout
 """
-import os
-import os.path as op
 
 import logging
-global logger
-logger = logging.basicConfig(filename='mous_fid_conv.log')
+logging.basicConfig(
+                level=logging.INFO,
+                force=True,
+                format='%(asctime)s %(message)s',
+                handlers=[logging.FileHandler("mous_fid_conv.log")])
+
+import os
+import os.path as op
 
 import json
 import copy
@@ -108,7 +112,7 @@ def convert_single_subject(bids_root=None,
     write_anat_json(anat_json=anat_t1w_json, 
                     fids=t1_vox_fids,
                     overwrite=overwrite)
-    logger.info(f'Success: {subject}')
+    logging.info(f'Success: {subject}')
     
     
 def convert_mous_project(bids_dir=None):
@@ -120,12 +124,12 @@ def convert_mous_project(bids_dir=None):
     
     for subjid in bids_subjs:
         print(f'Running: {subjid}')
-        logger.info(f'Running: {subjid}')
+        logging.info(f'Running: {subjid}')
         try:
             convert_single_subject(bids_dir, subject=subjid, overwrite=True)
         except BaseException as e:
             print(f'Error with {subjid}:\n {e}')
-            logger.Exception(f'Error with {subjid}:\n {e}')
+            logging.Exception(f'Error with {subjid}:\n {e}')
         
 
 if __name__=='__main__':
