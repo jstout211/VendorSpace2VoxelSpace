@@ -11,7 +11,7 @@ logging.basicConfig(
                 level=logging.INFO,
                 force=True,
                 format='%(asctime)s %(message)s',
-                handlers=[logging.FileHandler("mous_fid_conv.log")])
+                handlers=[logging.FileHandler("meguk_fid_conv.log")])
 
 import os
 import os.path as op
@@ -23,6 +23,21 @@ import numpy as np
 import glob
 from mne.transforms import apply_trans, invert_transform
 import mne
+import mne_bids
+from mne_bids import BIDSPath
+
+# def get_fiducials():
+    # subjid=subjid.copy()
+    # if subjid[0:4]=='sub-':
+    #     subjid=subjid[4:]
+        
+    # if subjid[0:3]=='gla':
+    #     #Dataset is in 
+    # if subjid[0:3]=='cdf':
+    #     coordsys='test'
+    # return    
+
+
 
 def list_nparr2list(nparray):
     return [float(i) for i in nparray]
@@ -42,7 +57,7 @@ def convert_ctf2t1(fidval, ctfmat):
     '''Provide the voxel index
     Assumes that both input and output mats are the same size'''
     i0,i1,i2=fidval
-    l0,l1,l2 = ctfmat.shape
+    l0,l1,l2 = ctfmat.squeeze().shape  #Squeeze fixes singleton dimensions
     i0=l0-i0
     o0 = i2
     o1 = i0
@@ -85,8 +100,10 @@ def convert_single_subject(bids_root=None,
         raise('space-CTF is not in the intended for label')
     
     anat_t1w = intended_for.replace('space-CTF_','')
-    anat_t1w_json = anat_t1w.replace('.nii','.json')
-    
+    if os.path.exists(anat_t1w.replace('.nii','.json')):
+        anat_t1w_json = anat_t1w.replace('.nii','.json')
+    elif os.path.exists(anat_t1w.replace('.nii.gz','.json')):
+        anat_t1w_json = anat_t1w.replace('.nii.gz','.json')
     fids = convert_headcoils2mm(coordsys)['HeadCoilCoordinates']
     
     #Get the FIDS
@@ -136,6 +153,14 @@ if __name__=='__main__':
     import sys
     bids_dir = sys.argv[1]
     convert_mous_project(bids_dir=bids_dir)
+
+# =============================================================================
+# TESTS MEGUK
+# =============================================================================
+
+
+
+
 
 # =============================================================================
 # TESTS
