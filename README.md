@@ -7,7 +7,7 @@ This code moves the fiducials localized on the CTF space MRI json in cm to the o
 This process only works because the data provides the original and ctf space with the same matrix dimensions.
 
 ```
-convert_mous.py MOUSBIDSDIR
+MOUS/convert_mous.py MOUSBIDSDIR
 ```
 Verify that all processes complete successfully before doing the next step. <br>
 Currently mne-bids-pipeline will error if the ctf space mris are present. <br>
