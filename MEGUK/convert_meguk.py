@@ -245,16 +245,29 @@ class fids_space_to_vox():
                                                  run=None,
                                                  session=None, 
                                                  extension='.ds')
-        self.t1w_bids_path = raw_bids_path.copy().update(datatype='anat', task=None, suffix='T1w', extension='.nii.gz', 
-                                                         space=None)
         raw = mne_bids.read_raw_bids(raw_bids_path).pick_types(meg=True)
+        anat_dir=os.path.dirname(self.anat_json_fname)
+        tmp_dir=os.path.join(anat_dir, 'TMP')
+        import shutil
+        try:
+            if not os.path.exists(tmp_dir): os.mkdir(tmp_dir)
+            fnames_mv = glob.glob(os.path.join(anat_dir, '*space-*'))
+            for i in fnames_mv:
+                shutil.move(i, tmp_dir)
+        except:
+            print('failed')
+        self.t1w_bids_path = raw_bids_path.copy().update(datatype='anat', task=None, suffix='T1w', extension='.nii.gz', 
+                                                             space=None)
         trans = mne_bids.get_head_mri_trans(raw_bids_path, 
-                                            t1_bids_path=self.t1w_bids_path,
-                                            fs_subject='sub-'+self.bids_path.subject) 
-                                            # subjects_dir = raw_) #raw_bids_path.copy().update(datatype='anat', task=None, suffix='T1w')#, extension='.nii.gz'))
+                                                t1_bids_path=self.t1w_bids_path,
+                                                fs_subject='sub-'+self.bids_path.subject) 
         mne.viz.plot_alignment(raw.info,
-                                trans=trans,
-                                subject='sub-'+self.bids_path.subject, dig=True)
+                                    trans=trans,
+                                    subject='sub-'+self.bids_path.subject, dig=True)
+        fnames_mv = glob.glob(os.path.join(tmp_dir, '*'))
+        if fnames_mv != []:
+            for i in fnames_mv:
+                shutil.move(i, anat_dir)
         
     def plot_mriview(self):
         import pylab
@@ -275,16 +288,34 @@ class fids_space_to_vox():
         pylab.subplot(2,3,6)
         pylab.imshow(self.t1mrimat[:, :, int(self.fids_T1w['NAS'][2])])
                                
-def test_meg_uk():
+def test_meg_uk(subjid):
     os.chdir('/fast/EnigmaTesting')
-    return fids_space_to_vox(subject='cdf037', bids_root='/fast/EnigmaTesting/bids',session=None) 
+    return fids_space_to_vox(subject=subjid, bids_root='/fast/EnigmaTesting/bids',session=None) 
 
-tmp = test_meg_uk()
-tmp.plot_mriview()
+# for i in ['sub-cdf040', 'sub-cdf043', 'sub-cdf046', 'sub-cdf044', 'sub-cdf045', 'sub-cdf049', 'sub-cdf041', 'sub-cdf047', 'sub-cdf048', 'sub-cdf042']:
+#     subjid = i.split('-')[1]
+#     test_meg_uk(subjid)
+
+
+# tmp = test_meg_uk()
+# tmp.plot_mriview()
 # tmp.plot_alignment()
 
 
 #%%
+os.environ['SUBJECTS_DIR']='/fast/EnigmaTesting/bids/derivatives/freesurfer/subjects'
+
+tmp_40=test_meg_uk('cdf040')
+tmp_43=test_meg_uk('cdf043')
+tmp_46=test_meg_uk('cdf046')
+tmp_44=test_meg_uk('cdf044')
+tmp_45=test_meg_uk('cdf045')
+tmp_49=test_meg_uk('cdf049')
+tmp_41=test_meg_uk('cdf041')
+tmp_47=test_meg_uk('cdf047')
+tmp_48=test_meg_uk('cdf048')
+tmp_42=test_meg_uk('cdf042')
+
 
 # =============================================================================
 # 
