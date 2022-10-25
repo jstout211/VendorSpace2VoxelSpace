@@ -53,16 +53,16 @@ def convert_headcoils2mm(coordsys):
         coordsys["HeadCoilCoordinateUnits"]='mm'
     return coordsys
 
-def convert_ctf2t1(fidval, ctfmat):
-    '''Provide the voxel index
-    Assumes that both input and output mats are the same size'''
-    i0,i1,i2=fidval
-    l0,l1,l2 = ctfmat.squeeze().shape  #Squeeze fixes singleton dimensions
-    i0=l0-i0
-    o0 = i2
-    o1 = i0
-    o2 = i1
-    return o0,o1,o2 
+# def convert_ctf2t1(fidval, ctfmat):
+#     '''Provide the voxel index
+#     Assumes that both input and output mats are the same size'''
+#     i0,i1,i2=fidval
+#     l0,l1,l2 = ctfmat.squeeze().shape  #Squeeze fixes singleton dimensions
+#     i0=l0-i0
+#     o0 = i1
+#     o1 = i0
+#     o2 = i2
+#     return o0,o1,o2 
 
 def write_anat_json(anat_json=None, 
                     fids=None,
@@ -154,6 +154,18 @@ def convert_mous_project(bids_dir=None):
 # =============================================================================
 #%%
 
+def convert_ctf2t1(fidval, ctfmat):
+    '''Provide the voxel index
+    Assumes that both input and output mats are the same size'''
+    i0,i1,i2=fidval
+    l0,l1,l2 = ctfmat.squeeze().shape  #Squeeze fixes singleton dimensions
+    i0=l0-i0
+    o0 = i0
+    o1 = i1
+    o2 = i2
+    return o0,o1,o2 
+
+
 class fids_space_to_vox():
     '''Convert vendor space to voxel space'''
     def __init__(self, subject=None, bids_root=None, session=1):
@@ -175,18 +187,11 @@ class fids_space_to_vox():
                     fids=self.fids_T1w,
                     overwrite=True)
 
-    # def write_anat_json(self):
-    #     write_anat_json(anat_json=anat_t1w_json, 
-    #                 fids=t1_vox_fids,
-    #                 overwrite=overwrite)
-        
-        
-        
     def get_coordsys_fname(self):
         _bidspath=self.bids_path.copy()
         if _bidspath.update(datatype='meg', suffix='coordsystem', extension='tsv').fpath:
             self.coordsys_json=_bidspath.update(datatype='meg', suffix='coordsystem', extension='json').fpath
-            
+    
     def get_fids(self):    
         with open(self.coordsys_json) as w:
             coordsys = json.load(w)
@@ -200,6 +205,7 @@ class fids_space_to_vox():
             raise('space-CTF is not in the intended for label')
         
         anat_t1w = intended_for.replace('space-CTF_','')
+        self.anat_t1w = anat_t1w
         if os.path.exists(anat_t1w.replace('.nii','.json')):
             anat_t1w_json = anat_t1w.replace('.nii','.json')
         elif os.path.exists(anat_t1w.replace('.nii.gz','.json')):
@@ -209,8 +215,8 @@ class fids_space_to_vox():
     def get_fids_voxel_ctf(self):
         fids=self.fids
         fid_arr=np.stack([np.array(fids['nasion']), 
-                 np.array(fids['left_ear']),
-                 np.array(fids['right_ear'])])
+                  np.array(fids['left_ear']),
+                  np.array(fids['right_ear'])])
         
         #CTFmri
         ctf_mri_fname=self.intended_for
@@ -218,23 +224,64 @@ class fids_space_to_vox():
         aff = ctf_mri.affine
         self.ctf_aff = ctf_mri.affine
         mat = ctf_mri.get_fdata()
-        self.ctf_mat = mat
+        self.ctf_mat = mat.squeeze()
         inv_trans = invert_transform(mne.Transform('ctf_meg','mri_voxel', aff))
         self.ctf_mrivox_trans = inv_trans
         fid_vox = apply_trans(inv_trans, fid_arr)
-        self.fids_vox_ctf = fid_vox
-        self.fids_T1w=dict(NAS=[i for i in fid_vox[0,:]], 
-                          LPA=[i for i in fid_vox[1,:]],
-                          RPA=[i for i in fid_vox[2,:]]) 
         
-    
+        nas_val = convert_ctf2t1(fid_vox[0], mat)
+        lpa_val = convert_ctf2t1(fid_vox[1], mat)
+        rpa_val = convert_ctf2t1(fid_vox[2], mat)
+        
+        
+        self.fids_vox_ctf = fid_vox
+        self.fids_T1w=dict(NAS=[i for i in nas_val], 
+                          LPA=[i for i in lpa_val],
+                          RPA=[i for i in rpa_val])
+        
+    def plot_alignment(self):
+        raw_bids_path = self.bids_path.copy().update(datatype='meg',
+                                                 task='resteyesclosed',
+                                                 run=None,
+                                                 session=None, 
+                                                 extension='.ds')
+        self.t1w_bids_path = raw_bids_path.copy().update(datatype='anat', task=None, suffix='T1w', extension='.nii.gz', 
+                                                         space=None)
+        raw = mne_bids.read_raw_bids(raw_bids_path).pick_types(meg=True)
+        trans = mne_bids.get_head_mri_trans(raw_bids_path, 
+                                            t1_bids_path=self.t1w_bids_path,
+                                            fs_subject='sub-'+self.bids_path.subject) 
+                                            # subjects_dir = raw_) #raw_bids_path.copy().update(datatype='anat', task=None, suffix='T1w')#, extension='.nii.gz'))
+        mne.viz.plot_alignment(raw.info,
+                                trans=trans,
+                                subject='sub-'+self.bids_path.subject, dig=True)
+        
+    def plot_mriview(self):
+        import pylab
+        import nibabel as nb
+        self.t1mrimat = nb.load(self.anat_t1w).get_fdata()
+        
+        pylab.subplot(2,3,1)
+        pylab.imshow(self.ctf_mat[int(self.fids_vox_ctf[0,0]), :, :])
+        pylab.subplot(2,3,2)
+        pylab.imshow(self.ctf_mat[:, int(self.fids_vox_ctf[0,1]), :])
+        pylab.subplot(2,3,3)
+        pylab.imshow(self.ctf_mat[:, :, int(self.fids_vox_ctf[0,2])])
+        
+        pylab.subplot(2,3,4)
+        pylab.imshow(self.t1mrimat[int(self.fids_T1w['NAS'][0]), :, :])
+        pylab.subplot(2,3,5)
+        pylab.imshow(self.t1mrimat[:, int(self.fids_T1w['NAS'][1]), :])
+        pylab.subplot(2,3,6)
+        pylab.imshow(self.t1mrimat[:, :, int(self.fids_T1w['NAS'][2])])
+                               
 def test_meg_uk():
     os.chdir('/fast/EnigmaTesting')
-    return fids_space_to_vox(subject='cdf021', bids_root='/fast/EnigmaTesting/bids',session=None) 
+    return fids_space_to_vox(subject='cdf037', bids_root='/fast/EnigmaTesting/bids',session=None) 
 
 tmp = test_meg_uk()
-print(tmp.fids_vox_ctf)
-
+tmp.plot_mriview()
+# tmp.plot_alignment()
 
 
 #%%
