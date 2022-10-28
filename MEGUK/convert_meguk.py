@@ -154,12 +154,16 @@ def convert_mous_project(bids_dir=None):
 # =============================================================================
 #%%
 
-def convert_ctf2t1(fidval, ctfmat):
+def convert_ctf2t1(fidval, ctfmat, t1aff=None):
     '''Provide the voxel index
     Assumes that both input and output mats are the same size'''
+    inv_x, inv_y , inv_z = np.diag(t1aff[0:3,0:3])
+
     i0,i1,i2=fidval
     l0,l1,l2 = ctfmat.squeeze().shape  #Squeeze fixes singleton dimensions
-    i0=l0-i0
+    
+    if inv_x > 0:
+        i0=l0-i0
     o0 = i0
     o1 = i1
     o2 = i2
@@ -206,6 +210,7 @@ class fids_space_to_vox():
         
         anat_t1w = intended_for.replace('space-CTF_','')
         self.anat_t1w = anat_t1w
+        self.anat_t1w_aff = nb.load(anat_t1w).affine
         if os.path.exists(anat_t1w.replace('.nii','.json')):
             anat_t1w_json = anat_t1w.replace('.nii','.json')
         elif os.path.exists(anat_t1w.replace('.nii.gz','.json')):
@@ -229,9 +234,9 @@ class fids_space_to_vox():
         self.ctf_mrivox_trans = inv_trans
         fid_vox = apply_trans(inv_trans, fid_arr)
         
-        nas_val = convert_ctf2t1(fid_vox[0], mat)
-        lpa_val = convert_ctf2t1(fid_vox[1], mat)
-        rpa_val = convert_ctf2t1(fid_vox[2], mat)
+        nas_val = convert_ctf2t1(fid_vox[0], mat, self.anat_t1w_aff)
+        lpa_val = convert_ctf2t1(fid_vox[1], mat, self.anat_t1w_aff)
+        rpa_val = convert_ctf2t1(fid_vox[2], mat, self.anat_t1w_aff)
         
         
         self.fids_vox_ctf = fid_vox
